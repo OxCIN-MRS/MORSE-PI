@@ -1,0 +1,18 @@
+[workspace]
+authors = ["wtclarke <william.clarke@ndcn.ox.ac.uk>"]
+channels = ["conda-forge"]
+name = "morse_pi"
+platforms = ["osx-arm64"]
+version = "0.1.0"
+
+[tasks]
+
+[dependencies]
+numpy = ">=2.5.3,<3"
+scipy = ">=1.18.1,<2"
+matplotlib = ">=3.11.2,<4"
+ipykernel = ">=7.3.0,<8"
+
+[target.osx-arm64.pypi-dependencies]
+mri-nufft = ">=1.4.0, <2"
+torchkbnufft = ">=1.5.0, <2"
