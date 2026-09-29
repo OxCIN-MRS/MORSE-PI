@@ -12,6 +12,7 @@ numpy = ">=2.5.3,<3"
 scipy = ">=1.18.1,<2"
 matplotlib = ">=3.11.2,<4"
 ipykernel = ">=7.3.0,<8"
+ruff = ">=0.16.9,<0.17"
 
 [target.osx-arm64.pypi-dependencies]
 mri-nufft = ">=1.4.0, <2"

@@ -2,9 +2,9 @@
 
 This repository is a third-party Python implementation of the [MORSE-PI](https://doi.org/10.48550/arXiv.2606.21336) coil sensitivity estimation method published by [Barbara Dymerska](https://profiles.ucl.ac.uk/67063-barbara-dymerska) and colleagues at the FIL, UCL.
 
-The code includes the ability to handle non-cartesian trajectories, using code from the [MRI-nufft](https://github.com/mind-inria/mri-nufft) package.
+The code accepts either non-Cartesian trajectories, using [MRI-nufft](https://github.com/mind-inria/mri-nufft), or already-gridded Cartesian calibration k-space.
 
-## Running the code
+## Non-Cartesian k-space
 ```
 from morse_pi import morse_pi
 
@@ -29,6 +29,22 @@ the first-order sensitivities only while constructing the VRC: `0` disables
 colouring, `1` applies it once, and so on. When whitening is enabled, power
 `1` restores inherent coil correlation and power `2` adds the paper's
 enhanced-correlation step.
+
+## Cartesian k-space
+
+```python
+from cartesian import morse_pi_cartesian
+
+morse_pi_sens = morse_pi_cartesian(
+    calib_kspace,  # centre-origin, fully sampled: (N_coils, kx, ky[, kz])
+    resolution=(128, 128),  # optional centre crop / zero-pad target
+    noise_cov=noise_cov,
+    noise_whiten=True,
+    noise_colour_power=2,
+)
+```
+
+The Cartesian interface does not need a trajectory, backend, or MRI-NUFFT.
 
 ## Attribution
 If you use this code in your own work please cite the original MORSE(-PI) publications.
