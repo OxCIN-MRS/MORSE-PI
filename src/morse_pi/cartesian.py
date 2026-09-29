@@ -3,7 +3,7 @@
 import numpy as np
 from numpy.typing import NDArray
 
-from morse_core import morse_pi_core, prepare_noise
+from .core import morse_pi_core, prepare_noise
 
 
 def _resize_kspace(kspace: NDArray, resolution: tuple[int, ...]) -> NDArray:
@@ -50,7 +50,6 @@ def morse_pi_cartesian(
     calib_kspace, noise_colour_factor = prepare_noise(
         calib_kspace, noise_cov, noise_whiten, noise_colour_power
     )
-    
     if resolution is not None:
         calib_kspace = _resize_kspace(calib_kspace, resolution)
     return morse_pi_core(

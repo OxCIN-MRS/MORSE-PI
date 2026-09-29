@@ -4,6 +4,14 @@ This repository is a third-party Python implementation of the [MORSE-PI](https:/
 
 The code accepts either non-Cartesian trajectories, using [MRI-nufft](https://github.com/mind-inria/mri-nufft), or already-gridded Cartesian calibration k-space.
 
+## Install
+
+```bash
+pip install .
+```
+
+Or create the development environment with `pixi install`.
+
 ## Non-Cartesian k-space
 ```
 from morse_pi import morse_pi
@@ -33,7 +41,7 @@ enhanced-correlation step.
 ## Cartesian k-space
 
 ```python
-from cartesian import morse_pi_cartesian
+from morse_pi import morse_pi_cartesian
 
 morse_pi_sens = morse_pi_cartesian(
     calib_kspace,  # centre-origin, fully sampled: (N_coils, kx, ky[, kz])

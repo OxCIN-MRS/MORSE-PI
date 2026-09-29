@@ -5,9 +5,7 @@ from unittest.mock import patch
 
 import numpy as np
 
-import cartesian
-import morse_core
-import morse_pi
+from morse_pi import cartesian, core, morse_pi, morse_pi_cartesian, noncartesian
 
 
 class NoiseCovarianceTests(unittest.TestCase):
@@ -17,25 +15,24 @@ class NoiseCovarianceTests(unittest.TestCase):
 
     def test_noise_covariance_validation(self):
         with self.assertRaisesRegex(ValueError, "noise_cov must have shape"):
-            morse_pi.morse_pi(
-                self.data, self.trajectory, (2, 2), "unused", noise_cov=np.eye(3)
-            )
+            morse_pi(self.data, self.trajectory, (2, 2), "unused", noise_cov=np.eye(3))
         with self.assertRaisesRegex(ValueError, "noise_cov is required"):
-            morse_pi.morse_pi(
-                self.data, self.trajectory, (2, 2), "unused", noise_whiten=True
-            )
+            morse_pi(self.data, self.trajectory, (2, 2), "unused", noise_whiten=True)
 
     def test_whitening_precedes_reconstruction(self):
         noise_cov = np.array([[4.0, 0.0], [0.0, 9.0]])
         expected = np.linalg.solve(np.linalg.cholesky(noise_cov), self.data)
         central_kspace = np.array(
-            [[[1 + 0j, 2 + 0j], [3 + 0j, 4 + 0j]], [[2 + 0j, 1 + 0j], [4 + 0j, 3 + 0j]]]
+            [
+                [[1 + 0j, 2 + 0j], [3 + 0j, 4 + 0j]],
+                [[2 + 0j, 1 + 0j], [4 + 0j, 3 + 0j]],
+            ]
         )
 
         with patch.object(
-            morse_pi, "cartesian_kspace_centre", return_value=central_kspace
+            noncartesian, "cartesian_kspace_centre", return_value=central_kspace
         ) as centre:
-            morse_pi.morse_pi(
+            morse_pi(
                 self.data,
                 self.trajectory,
                 (2, 2),
@@ -54,7 +51,7 @@ class VrcTests(unittest.TestCase):
         coloured = np.einsum("ij,...j->...i", factor, sens[0])
         expected_vrc = np.sum(coloured * np.exp(-1j * np.angle(coloured[0])), axis=-1)
 
-        corrected, vrc = morse_core.morse_pi_vrc(
+        corrected, vrc = core.morse_pi_vrc(
             sens, centre=(0,), noise_colour_factor=factor
         )
 
@@ -67,16 +64,11 @@ class VrcTests(unittest.TestCase):
 
 class CartesianTests(unittest.TestCase):
     def setUp(self):
-        image = np.stack(
-            [
-                np.ones((4, 4)),
-                np.arange(16).reshape(4, 4) + 1j,
-            ]
-        )
-        self.kspace = morse_core.centred_fft(image)
+        image = np.stack([np.ones((4, 4)), np.arange(16).reshape(4, 4) + 1j])
+        self.kspace = core.centred_fft(image)
 
     def test_cartesian_estimation_and_resize(self):
-        sens = cartesian.morse_pi_cartesian(
+        sens = morse_pi_cartesian(
             self.kspace, resolution=(6, 2), N_ref=2, smoothing_sd=1
         )
         self.assertEqual(sens.shape, (6, 2, 2, 2))
@@ -93,18 +85,21 @@ class CartesianTests(unittest.TestCase):
         expected = np.linalg.solve(
             np.linalg.cholesky(noise_cov), self.kspace.reshape(2, -1)
         ).reshape(self.kspace.shape)
-        with patch.object(cartesian, "morse_pi_core", return_value=np.empty(0)) as core:
-            cartesian.morse_pi_cartesian(
-                self.kspace, noise_cov=noise_cov, noise_whiten=True
-            )
-        np.testing.assert_allclose(core.call_args.args[0], expected)
+        with patch.object(
+            cartesian, "morse_pi_core", return_value=np.empty(0)
+        ) as core_fn:
+            morse_pi_cartesian(self.kspace, noise_cov=noise_cov, noise_whiten=True)
+        np.testing.assert_allclose(core_fn.call_args.args[0], expected)
 
     def test_cartesian_import_does_not_load_mrinufft(self):
         subprocess.run(
             [
                 sys.executable,
                 "-c",
-                "import cartesian, sys; assert 'mrinufft' not in sys.modules",
+                (
+                    "from morse_pi import cartesian; import sys; "
+                    "assert 'mrinufft' not in sys.modules"
+                ),
             ],
             check=True,
         )

@@ -3,7 +3,7 @@
 import numpy as np
 from numpy.typing import NDArray
 
-from morse_core import centred_fft, morse_pi_core, prepare_noise
+from .core import centred_fft, morse_pi_core, prepare_noise
 
 
 def cartesian_kspace_centre(
@@ -78,7 +78,6 @@ def morse_pi(
     data, noise_colour_factor = prepare_noise(
         data, noise_cov, noise_whiten, noise_colour_power
     )
-
     c_kspace = cartesian_kspace_centre(trajectory, resolution, data, backend=backend)
 
     return morse_pi_core(
