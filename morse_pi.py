@@ -59,19 +59,28 @@ def cartesian_kspace_centre(
 
 def _morse_pi_vrc(
         sens: NDArray,
-        centre: tuple[int, ...] | None = None):
+        centre: tuple[int, ...] | None = None,
+        noise_colour_factor: NDArray | None = None):
 
     if centre is None:
         centre = tuple(int(x / 2) for x in sens.shape[1:-1])
-    centre_coils = (0, ) + centre + (slice(None), )
+    vrc_sens = sens[0, ...]
+    if noise_colour_factor is not None:
+        vrc_sens = np.einsum(
+            "ij,...j->...i", noise_colour_factor, vrc_sens)
 
-    phi_coil_centre = np.angle(sens[centre_coils])
+    centre_coils = centre + (slice(None), )
+
+    phi_coil_centre = np.angle(vrc_sens[centre_coils])
 
     vrc = np.sum(
-        sens[0, ...] * np.exp(-1j * phi_coil_centre),
+        vrc_sens * np.exp(-1j * phi_coil_centre),
         axis=-1)
 
-    return sens * np.exp(-1j * np.angle(vrc)[np.newaxis, ..., np.newaxis]), vrc
+    sens_corrected = sens.copy()
+    sens_corrected[0, ...] *= np.exp(-1j * np.angle(vrc)[..., np.newaxis])
+
+    return sens_corrected, vrc
 
 
 def morse_pi(
@@ -80,7 +89,10 @@ def morse_pi(
     resolution: tuple[int, ...],
     backend: str,
     N_ref: int = 6,
-    smoothing_sd: int = 3
+    smoothing_sd: int = 3,
+    noise_cov: NDArray | None = None,
+    noise_whiten: bool = False,
+    noise_colour_power: int = 0,
 ) -> NDArray:
     """Calculate sensitivity maps up to order N_ref using the 
     MORSE-PI method.
@@ -107,6 +119,12 @@ def morse_pi(
     :type resolution: tuple[int]
     :param N_ref: Number of reference coils to construct and coil sensitivity order, defaults to 6
     :type N_ref: int, optional
+    :param noise_cov: Noise covariance matrix with shape (NCoils, NCoils).
+    :type noise_cov: NDArray, optional
+    :param noise_whiten: Whiten k-space with the Cholesky factor of noise_cov before processing.
+    :type noise_whiten: bool, optional
+    :param noise_colour_power: Cholesky-factor power used to colour first-order sensitivities for VRC construction.
+    :type noise_colour_power: int, optional
     :return: Complex coil sensitivites (x, y, z, Ncoils, NRef)
     :rtype: NDArray
     """
@@ -116,6 +134,29 @@ def morse_pi(
         raise ValueError(
             "The length of resolution must be 2 or three, "
             "and must match the number of spatial dimensions in trajectory.")
+
+    # Handle noise covariance if provided.
+    # The matrix's shape must match the number of coils in data.
+    if noise_cov is not None:
+        noise_cov = np.asarray(noise_cov)
+        expected_noise_cov_shape = (data.shape[0], data.shape[0])
+        if noise_cov.shape != expected_noise_cov_shape:
+            raise ValueError(
+                "noise_cov must have shape "
+                f"{expected_noise_cov_shape}, got {noise_cov.shape}.")
+
+    if not isinstance(noise_colour_power, int) or noise_colour_power < 0:
+        raise ValueError("noise_colour_power must be a non-negative integer.")
+
+    if (noise_whiten or noise_colour_power) and noise_cov is None:
+        raise ValueError(
+            "noise_cov is required when noise_whiten or noise_colour_power is enabled.")
+
+    noise_factor = None
+    if noise_cov is not None and (noise_whiten or noise_colour_power):
+        noise_factor = np.linalg.cholesky(noise_cov)
+        if noise_whiten:
+            data = np.linalg.solve(noise_factor, data)
 
     c_kspace = cartesian_kspace_centre(
         trajectory,
@@ -154,7 +195,14 @@ def morse_pi(
     sens = (Vh.T @ U2).T
 
     # From VRC
-    sens_corrected, vrc = _morse_pi_vrc(
-        np.moveaxis(sens, 1, -1))
+    noise_colour_factor = None
+    if noise_colour_power and noise_factor is not None:
+        noise_colour_factor = np.linalg.matrix_power(
+            noise_factor,
+            noise_colour_power)
+
+    sens_corrected, _ = _morse_pi_vrc(
+        np.moveaxis(sens, 1, -1),
+        noise_colour_factor=noise_colour_factor)
 
     return np.ascontiguousarray(np.moveaxis(sens_corrected, 0, -1))

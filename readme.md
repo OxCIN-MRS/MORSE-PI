@@ -12,12 +12,23 @@ morse_pi_sens = morse_pi(
     k_data.reshape((N_coils, -1)),
     traj.reshape((-1, n_dim)),
     reconstruction_resolution,
-    backend='torchkbnufft-cpu')
+    backend='torchkbnufft-cpu',
+    noise_cov=noise_cov,
+    noise_whiten=True,
+    noise_colour_power=2)
 ```
 
 Where `k_data` is the complex k-space data, `traj` is the k-space trajectory scaled to ±Pi, `reconstruction_resolution` is a tuple specifying the reconstruction resolution.
 
 The output `morse_pi_sens` is the estimated complex coil sensitivites `(x, y, z, N_coils, NRef)`
+
+`noise_cov` is an optional complex noise covariance matrix with shape
+`(N_coils, N_coils)`. Set `noise_whiten=True` to pre-whiten k-space before
+MORSE processing. `noise_colour_power` applies the lower Cholesky factor to
+the first-order sensitivities only while constructing the VRC: `0` disables
+colouring, `1` applies it once, and so on. When whitening is enabled, power
+`1` restores inherent coil correlation and power `2` adds the paper's
+enhanced-correlation step.
 
 ## Attribution
 If you use this code in your own work please cite the original MORSE(-PI) publications.
@@ -42,4 +53,3 @@ The original authors have their own `Matlab+Gadgetron`-based implementation whic
 The open-source code, as well as scripts necessary to compile a Gadgetron image and create a Docker container encapsulating the MORSE-PI reconstruction, are available on:
 https://github.com/fil-physics/gadgetron-matlab.
 ```
-
