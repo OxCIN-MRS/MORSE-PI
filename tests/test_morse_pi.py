@@ -45,6 +45,54 @@ class NoiseCovarianceTests(unittest.TestCase):
 
 
 class VrcTests(unittest.TestCase):
+    def test_seed_uses_masked_rss_not_squared_weights(self):
+        rss = np.zeros((7, 5))
+        rss[:5, 1] = [1, 0.5, 0.5, 0.5, 4]
+        rss[6, 4] = 10  # Brighter, but smaller disconnected component.
+        self.assertEqual(core._vrc_seed(rss), (3, 1))
+
+    def test_seed_ignores_background_outside_mask(self):
+        rss = np.full((10, 10), 0.1)
+        rss[0, 0] = 100
+        self.assertEqual(core._vrc_seed(rss), (0, 0))
+
+    def test_seed_3d_connectivity_axis_order_and_rounding(self):
+        rss = np.zeros((4, 6, 8))
+        rss[1, 2, 3] = rss[2, 3, 4] = 1
+        self.assertEqual(core._vrc_seed(rss), (2, 3, 4))
+
+    def test_seed_2d_diagonal_connectivity(self):
+        rss = np.zeros((5, 5))
+        rss[1, 1] = rss[2, 2] = 1
+        self.assertEqual(core._vrc_seed(rss), (2, 2))
+
+    def test_seed_volume_tie_uses_matlab_order(self):
+        rss = np.zeros((5, 5))
+        rss[0, 4] = rss[4, 0] = 1
+        self.assertEqual(core._vrc_seed(rss), (4, 0))
+
+    def test_invalid_calibration_has_no_seed(self):
+        for rss in (np.zeros((3, 4)), np.full((3, 4), np.nan)):
+            with self.assertRaisesRegex(ValueError, "cannot define a VRC seed"):
+                core._vrc_seed(rss)
+        with self.assertRaisesRegex(ValueError, "cannot define a VRC seed"):
+            core.morse_pi_core(np.zeros((2, 3, 4), dtype=complex))
+
+    def test_core_uses_all_calibration_coils_before_reference_truncation(self):
+        image = np.zeros((2, 5, 7), dtype=complex)
+        image[0, 1, 2] = 1j
+        image[1, 3, 4] = 3
+        image[1, 3, 5] = 2
+        with (
+            patch.object(core, "_vrc_seed", wraps=core._vrc_seed) as seed,
+            patch.object(core, "morse_pi_vrc", wraps=core.morse_pi_vrc) as vrc,
+        ):
+            core.morse_pi_core(core.centred_fft(image), N_ref=1)
+        np.testing.assert_allclose(
+            seed.call_args.args[0], np.linalg.norm(image, axis=0), atol=1e-12
+        )
+        self.assertEqual(vrc.call_args.kwargs["centre"], (3, 4))
+
     def test_only_first_order_is_phase_corrected(self):
         sens = np.array([[[1 + 0j, 1j]], [[2 + 3j, 4 + 5j]]])
         factor = np.array([[1.0, 0.0], [0.5, 1.0]])
@@ -59,6 +107,11 @@ class VrcTests(unittest.TestCase):
         np.testing.assert_array_equal(corrected[1], sens[1])
         np.testing.assert_allclose(
             corrected[0], sens[0] * np.exp(-1j * np.angle(vrc))[..., np.newaxis]
+        )
+        np.testing.assert_allclose(abs(corrected), abs(sens))
+        np.testing.assert_allclose(
+            corrected[0, ..., 0] * corrected[0, ..., 1].conj(),
+            sens[0, ..., 0] * sens[0, ..., 1].conj(),
         )
 
 

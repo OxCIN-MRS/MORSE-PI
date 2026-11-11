@@ -54,6 +54,16 @@ morse_pi_sens = morse_pi_cartesian(
 
 The Cartesian interface does not need a trajectory, backend, or MRI-NUFFT.
 
+Both interfaces select the VRC phase-reference voxel using the authors' masked
+RSS-weighted centroid, rather than the array midpoint. Calibration RSS uses all
+coils after any requested whitening and before VRC colouring. The mask is
+`RSS > 0.8 * mean(RSS)`; the largest connected component (8-connectivity in 2D,
+26-connectivity in 3D) supplies the RSS-weighted centroid. Coordinates are rounded
+to the nearest voxel, with half ties rounded up. Equal-size components are
+resolved in MATLAB column-major order. Calibration without positive magnitude
+raises `ValueError`. This seed rule does not guarantee removal of every shared
+phase singularity.
+
 ## Attribution
 If you use this code in your own work please cite the original MORSE(-PI) publications.
 

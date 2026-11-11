@@ -5,3 +5,5 @@
 .DS_Store
 .vscode
 __pycache__
+
+morse_pi.egg-info
